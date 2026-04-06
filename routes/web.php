@@ -2,37 +2,53 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome', [
-    'greeting' => 'Hello, World!',
-    'name' => 'John Doe',
-    'age' => 30,
-    'tasks' => [
-        'Learn Laravel',
-        'Build a project',
-        'Deploy to production',
-    ],
-]);
-
+// Static Pages
+Route::view('/', 'welcome');
 Route::view('/about', 'about');
 Route::view('/contact', 'contact');
 
-Route::get('/formtest', function(){
-    $emails = session()->get('$emails', []);
-
-    return view('formtest',[
-        'emails' => $emails,
+// Activity 2 - Email Form
+Route::get('/formtest', function () {
+    return view('formtest', [
+        'emails' => session('emails', [])
     ]);
 });
 
-Route::post('/formtest', function(){
-    $email = request('email');
+Route::post('/formtest', function () {
+    $emails = session('emails', []);
 
-    session()->push('$emails', $email);
+    // 1. Check Capacity
+    if (count($emails) >= 5) {
+        return back()->with('warning', 'Maximum of 5 emails reached.')->withInput();
+    }
 
-    return redirect('/formtest');
+    // 2. Validate Format
+    request()->validate([
+        'email' => 'required|email',
+    ]);
+
+    $newEmail = request('email');
+
+    // 3. Check Duplicates
+    if (in_array($newEmail, $emails)) {
+        return back()->with('error', 'That email is already in the list.')->withInput();
+    }
+
+    // 4. Save to Session
+    $emails[] = $newEmail;
+    session(['emails' => $emails]);
+
+    return back()->with('success', 'Email added successfully!');
 });
 
-Route::get('/delete-emails', function(){
-    session()->forget('$emails');
-    return redirect('/formtest');
+Route::post('/formtest/delete', function () {
+    $emails = session('emails', []);
+    $emailToDelete = request('email');
+
+    // Filter out the target email and reset array keys
+    $emails = array_values(array_filter($emails, fn($e) => $e !== $emailToDelete));
+    
+    session(['emails' => $emails]);
+
+    return back()->with('success', 'Email removed.');
 });
